@@ -13,7 +13,8 @@
       "outputs": [
         ".next/**",
         "!.next/cache/**",
-        "apps/go-api/bin/**"
+        "apps/go-api/bin/**",
+        "packages/database/bin/**"
       ]
     },
     "lint": {
