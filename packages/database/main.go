@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"database/models"
+	"models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -45,8 +45,13 @@ func main() {
 		log.Fatalf("error connecting to database: %v", err)
 	}
 
-	// Migrate to database
-	if err := Migrate(db); err != nil {
-		log.Fatalf("error migrating to database: %v", err)
-	}
+	// Print the database
+	fmt.Println(db)
+
+	/*
+		// Migrate to database
+		if err := Migrate(db); err != nil {
+			log.Fatalf("error migrating to database: %v", err)
+		}
+	*/
 }
