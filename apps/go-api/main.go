@@ -8,9 +8,12 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
 
+	"github.com/spanhornet/brambles/apps/go-api/routes"
+
 	"github.com/spanhornet/brambles/packages/database"
-	"github.com/spanhornet/brambles/packages/database/models"
 )
+
+const apiVersion = "/api/v1"
 
 func main() {
 	// Load environment variables
@@ -29,26 +32,14 @@ func main() {
 		log.Fatalf("error connecting to database: %v", err)
 	}
 
-	// Insert a new user
-	newUser := models.User{
-		FirstName:       "John",
-		LastName:        "Doe",
-		Email:           "john.doe@example.com",
-		IsEmailVerified: false,
-		Phone:           "(123) 456-7890",
-		IsPhoneVerified: false,
-		Password:        "password",
-	}
-	if err := db.Create(&newUser).Error; err != nil {
-		log.Fatalf("error creating user: %v", err)
-	}
-	log.Printf("created user with ID: %s\n", newUser.ID)
-
 	// Start server
 	app := fiber.New()
 	app.Use(logger.New(logger.Config{
 		Format: "[${ip}]:${port} ${status} - ${method} ${path}\n",
 	}))
+
+	v1 := app.Group(apiVersion)
+	routes.RegisterRoutes(v1, db)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
