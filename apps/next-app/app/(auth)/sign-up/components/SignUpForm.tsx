@@ -72,7 +72,7 @@ export function SignUpForm({
     setLoading(true);
     try {
       try {
-        const data = await api.post('/api/users/sign-up', {
+        await api.post('/api/v1/users/sign-up', {
           firstName: values.firstName,
           lastName: values.lastName,
           email: values.email,

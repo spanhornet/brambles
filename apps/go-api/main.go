@@ -5,7 +5,9 @@ import (
 	"os"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+
 	"github.com/joho/godotenv"
 
 	"github.com/spanhornet/brambles/apps/go-api/routes"
@@ -36,6 +38,11 @@ func main() {
 	app := fiber.New()
 	app.Use(logger.New(logger.Config{
 		Format: "[${ip}]:${port} ${status} - ${method} ${path}\n",
+	}))
+
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "http://localhost:3000",
+		AllowCredentials: true,
 	}))
 
 	v1 := app.Group(apiVersion)

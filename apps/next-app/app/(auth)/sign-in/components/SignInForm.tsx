@@ -73,7 +73,7 @@ export function SignInForm({
     setLoading(true);
     try {
       try {
-        const data = await api.post('/api/users/sign-in', {
+        await api.post('/api/v1/users/sign-in', {
           email: values.email,
           password: values.password,
           remember: values.rememberMe
