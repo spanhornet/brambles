@@ -14,7 +14,6 @@ type Session struct {
 
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`
-
 	ExpiresAt time.Time `gorm:"not null"`
 
 	Token string `gorm:"type:text;uniqueIndex;not null"`

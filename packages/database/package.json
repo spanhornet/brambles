@@ -1,8 +1,0 @@
-{
-  "name": "database",
-  "version": "1.0.0",
-  "scripts": {
-    "build": "go build -o bin/go-api main.go",
-    "dev": "go run main.go"
-  }
-}
