@@ -229,7 +229,7 @@ export default function Home() {
               className="flex items-center gap-2"
             >
               <Play className="h-4 w-4" />
-              {isStreaming ? "Streaming..." : "Stream"}
+              Start
             </Button>
 
             <Button
