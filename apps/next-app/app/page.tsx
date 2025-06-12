@@ -1,11 +1,25 @@
 "use client"
 
 // React Hooks
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 
 // UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 // `ModeToggle` Component
 import { ModeToggle } from "@/components/mode-toggle";
@@ -23,9 +37,87 @@ import {
   PlayIcon,
   SquareIcon,
   Trash2Icon,
+  CheckIcon,
+  ChevronDownIcon,
 } from "lucide-react";
 
 import { api } from "@/lib/api-handler";
+import { cn } from "@/lib/clsx-handler";
+
+interface Chat {
+  ID: string;
+  Name: string;
+  created_at: string;
+}
+
+interface ChatSelectProps {
+  chats: Chat[];
+  selectedChat?: string;
+  onSelect: (chatId: string) => void;
+}
+
+function ChatSelect({ chats, selectedChat, onSelect }: ChatSelectProps) {
+  const id = useId()
+  const [open, setOpen] = useState<boolean>(false)
+
+  return (
+    <div className="*:not-first:mt-2">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            id={id}
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="bg-background hover:bg-background text-foreground border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]"
+          >
+            <span className={cn("truncate", !selectedChat && "text-muted-foreground")}>
+              {selectedChat
+                ? chats.find((chat) => chat.ID === selectedChat)?.Name
+                : "Select chat"}
+            </span>
+            <ChevronDownIcon
+              size={16}
+              className="text-muted-foreground/80 shrink-0"
+              aria-hidden="true"
+            />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          className="border-input w-full min-w-[var(--radix-popover-anchor-width)] p-0"
+          align="start"
+        >
+          <Command>
+            <CommandInput placeholder="Search chats..." />
+            <CommandList>
+              <CommandEmpty>No chats found.</CommandEmpty>
+              <CommandGroup>
+                {chats.map((chat, index) => (
+                  <CommandItem
+                    key={index}
+                    value={chat.ID}
+                    onSelect={(currentValue) => {
+                      onSelect(currentValue === selectedChat ? "" : currentValue)
+                      setOpen(false)
+                    }}
+                  >
+                    {chat.Name}
+                    <span className="text-xs text-muted-foreground">
+                      {chat.ID}
+                    </span>
+                    {selectedChat === chat.ID && (
+                      <CheckIcon size={16} className="ml-auto" />
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  )
+}
 
 interface StreamEvent {
   word?: string;
@@ -67,6 +159,12 @@ export default function Home() {
 
   // Add state for chats
   const [chats, setChats] = useState<any[]>([]);
+
+  // Add state for selected chat
+  const [selectedChat, setSelectedChat] = useState<string>("");
+
+  // Add state for chat message
+  const [message, setMessage] = useState("");
 
   const saveLastSeenIndex = (index: number) => {
     localStorage.setItem("lastSeenIndex", index.toString());
@@ -364,6 +462,12 @@ export default function Home() {
     }
   };
 
+  const handleSendMessage = () => {
+    if (!message.trim() || !selectedChat) return;
+    console.log("Sending message:", message, "to chat:", selectedChat);
+    setMessage("");
+  };
+
   useEffect(() => {
     // Restore previously streamed words (if any) from localStorage
     const savedWords = getStreamedWords();
@@ -413,7 +517,7 @@ export default function Home() {
   return (
     <div className="p-4 space-y-4 max-w-4xl mx-auto">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">SSE Word Streaming Demo</h1>
+        <h1 className="text-xl font-medium">Brambles</h1>
         <ModeToggle />
       </div>
 
@@ -527,6 +631,45 @@ export default function Home() {
           <pre className="bg-muted p-4 rounded-md text-sm overflow-auto">
             {JSON.stringify(chats, null, 2)}
           </pre>
+        </div>
+
+        <div className="mt-4">
+          <ChatSelect
+            chats={chats}
+            selectedChat={selectedChat}
+            onSelect={setSelectedChat}
+          />
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto">
+            {JSON.stringify(chats.find(chat => chat.ID === selectedChat) || selectedChat, null, 2)}
+          </pre>
+        </div>
+
+        {/* Chatbox with input and send button */}
+        <div className="mt-4">
+          <div className="flex gap-2">
+            <Input
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Type your message..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              disabled={!selectedChat}
+            />
+            <Button
+              onClick={handleSendMessage}
+              disabled={!message.trim() || !selectedChat}
+              className="shrink-0"
+            >
+              Send message
+            </Button>
+          </div>
         </div>
       </div>
     </div>
