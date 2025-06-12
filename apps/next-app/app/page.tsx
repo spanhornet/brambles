@@ -17,11 +17,11 @@ import { useSession } from "@/lib/hooks/useSession";
 
 // Lucide Icons
 import {
-  LoaderCircle,
-  LogOut,
-  Play,
-  Square,
-  Trash2,
+  LoaderCircleIcon,
+  LogOutIcon,
+  PlayIcon,
+  SquareIcon,
+  Trash2Icon,
 } from "lucide-react";
 
 interface StreamEvent {
@@ -36,7 +36,7 @@ export default function Home() {
   // Set router
   const router = useRouter();
 
-  // State for SSE
+  // Set State for streaming
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamedWords, setStreamedWords] = useState<string[]>([]);
   const [streamStatus, setStreamStatus] = useState<string>("");
@@ -52,9 +52,60 @@ export default function Home() {
     signOut,
   } = useSession();
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.push("/sign-in");
+  // Set state for inactivity timer
+  const INACTIVITY_TIMEOUT = 5000;
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const saveLastSeenIndex = (index: number) => {
+    localStorage.setItem("lastSeenIndex", index.toString());
+  };
+
+  const getLastSeenIndex = () => {
+    return parseInt(localStorage.getItem("lastSeenIndex") || "0", 10);
+  };
+
+  const clearLastSeenIndex = () => {
+    localStorage.removeItem("lastSeenIndex");
+  };
+
+  // Herlper to save streamed words
+  const saveStreamedWords = (words: string[]) => {
+    try {
+      localStorage.setItem("streamedWords", JSON.stringify(words));
+    } catch {
+      /* ignore quota / serialization errors */
+    }
+  };
+
+  // Helper to get streamed words
+  const getStreamedWords = (): string[] => {
+    try {
+      return JSON.parse(localStorage.getItem("streamedWords") || "[]");
+    } catch {
+      return [];
+    }
+  };
+
+  // Helper to clear streamed words
+  const clearStreamedWords = () => {
+    localStorage.removeItem("streamedWords");
+  };
+
+  // Helper to clear inactivity timer
+  const clearInactivityTimer = () => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+  };
+
+  // Helper to reset inactivity timer
+  const resetInactivityTimer = (resume: () => void) => {
+    clearInactivityTimer();
+    inactivityTimerRef.current = setTimeout(() => {
+      console.warn("Inactivity timeout. Attempting to resume...");
+      resume();
+    }, INACTIVITY_TIMEOUT) as unknown as NodeJS.Timeout;
   };
 
   const parseSSELine = (line: string): { event: string; data: string } | null => {
@@ -67,106 +118,184 @@ export default function Home() {
     return null;
   };
 
-  const startStreaming = async () => {
-    // Exit early if already streaming
-    if (isStreaming) return;
-
-    // Set initial streaming state
+  const resumeStreaming = async () => {
+    const lastIndex = getLastSeenIndex();
+    setStreamStatus(`Reconnecting from word ${lastIndex}...`);
     setIsStreaming(true);
-    setStreamedWords([]);
-    setStreamStatus("Connecting...");
 
     // Create abort controller
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
     try {
-      const response = await fetch('http://localhost:8080/api/v1/chat/demo-chat/message', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch("http://localhost:8080/api/v1/chat/demo-chat/resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lastSeenIndex: lastIndex }),
+        signal: abortController.signal,
+      });
+
+      if (!response.ok) throw new Error("Resume request failed");
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No stream reader");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let currentEvent = "";
+
+      resetInactivityTimer(resumeStreaming);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          setIsStreaming(false);
+          clearInactivityTimer();
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const parsed = parseSSELine(line.trim());
+          if (parsed?.event) currentEvent = parsed.event;
+          else if (parsed?.data && currentEvent) {
+            const data: StreamEvent = JSON.parse(parsed.data);
+
+            switch (currentEvent) {
+              case "word":
+                if (data.word && typeof data.index === "number") {
+                  if (!streamedWords.includes(data.word)) {
+                    setStreamedWords((prev) => {
+                      const updated = [...prev, data.word!];
+                      saveStreamedWords(updated);
+                      return updated;
+                    });
+                    saveLastSeenIndex(data.index);
+                    resetInactivityTimer(resumeStreaming);
+                  }
+                }
+                break;
+              case "complete":
+                setStreamStatus(`Completed: ${data.totalWords} words`);
+                clearLastSeenIndex();
+                clearInactivityTimer();
+                setIsStreaming(false);
+                break;
+            }
+            currentEvent = "";
+          }
+        }
+      }
+    } catch (error: any) {
+      // Treat user-aborted streams silently
+      const aborted =
+        (error?.name && error.name === "AbortError") ||
+        (typeof error?.message === "string" && error.message.toLowerCase().includes("aborted"));
+
+      if (aborted) {
+        setStreamStatus("Stopped by user");
+        clearLastSeenIndex();
+      } else {
+        console.error("Resume error:", error);
+        setStreamStatus("Failed to resume. Please restart.");
+      }
+      setIsStreaming(false);
+    }
+  };
+
+  const startStreaming = async () => {
+    if (isStreaming) return;
+
+    setIsStreaming(true);
+    setStreamedWords([]);
+    saveStreamedWords([]);
+    setStreamStatus("Connecting...");
+    clearLastSeenIndex();
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    try {
+      const response = await fetch("http://localhost:8080/api/v1/chat/demo-chat/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: "Hello, world! This is a demonstration of Server-Sent Events streaming words one by one. Each word appears with a slight delay to simulate real-time generation.",
         }),
         signal: abortController.signal,
       });
 
-      if (!response.ok) {
-        throw new Error(`Error: ${response.statusText}`);
-      }
+      if (!response.ok) throw new Error("Initial stream request failed");
 
-      // Get a stream reader from the response body
       const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('ReadableStream is not supported');
-      }
+      if (!reader) throw new Error("No stream reader");
 
       const decoder = new TextDecoder();
-      let buffer = '';
-      let currentEvent = '';
+      let buffer = "";
+      let currentEvent = "";
+
+      resetInactivityTimer(resumeStreaming);
 
       while (true) {
         const { done, value } = await reader.read();
-
         if (done) {
           setIsStreaming(false);
+          clearInactivityTimer();
           break;
         }
 
-        // Decode and append new data to buffer
         buffer += decoder.decode(value, { stream: true });
-
-        // Split into individual lines and preserve leftover
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
 
         for (const line of lines) {
-          // Parse Server-Sent Events (SSE) line
           const parsed = parseSSELine(line.trim());
-
-          // Update current event type if available
-          if (parsed?.event) {
-            currentEvent = parsed.event;
-          }
-          // Handle data for the current event
+          if (parsed?.event) currentEvent = parsed.event;
           else if (parsed?.data && currentEvent) {
-            try {
-              const data: StreamEvent = JSON.parse(parsed.data);
+            const data: StreamEvent = JSON.parse(parsed.data);
 
-              switch (currentEvent) {
-                case 'start':
-                  // Update status when streaming starts
-                  setStreamStatus(`Started streaming: ${data.chatId}`);
-                  break;
-                case 'word':
-                  // Add streamed word to list
-                  if (data.word) {
-                    setStreamedWords(prev => [...prev, data.word!]);
-                  }
-                  break;
-                case 'complete':
-                  // Finish streaming and show total
-                  setStreamStatus(`Completed streaming: ${data.totalWords} words`);
-                  setIsStreaming(false);
-                  return;
-              }
-            } catch (e) {
-              // Handle malformed JSON data
-              console.error('Error parsing SSE data:', e);
+            switch (currentEvent) {
+              case "start":
+                setStreamStatus(`Started streaming: ${data.chatId}`);
+                break;
+              case "word":
+                if (data.word && typeof data.index === "number") {
+                  setStreamedWords((prev) => {
+                    const updated = [...prev, data.word!];
+                    saveStreamedWords(updated);
+                    return updated;
+                  });
+                  saveLastSeenIndex(data.index);
+                  resetInactivityTimer(resumeStreaming);
+                }
+                break;
+              case "complete":
+                setStreamStatus(`Completed: ${data.totalWords} words`);
+                clearLastSeenIndex();
+                clearInactivityTimer();
+                setIsStreaming(false);
+                return;
             }
-            currentEvent = '';
+            currentEvent = "";
           }
         }
       }
     } catch (error: any) {
-      // Handle user-initiated abort
-      if (error.name === 'AbortError') {
-        setStreamStatus("Stopped");
+      // Detect abort errors reliably across browsers
+      const aborted =
+        (error?.name && error.name === "AbortError") ||
+        (typeof error?.message === "string" && error.message.toLowerCase().includes("aborted"));
+
+      if (aborted) {
+        setStreamStatus("Stopped by user");
+        clearLastSeenIndex();
       } else {
-        // Handle other errors during streaming
-        console.error('Streaming Error:', error);
-        setStreamStatus("Connection error occurred");
+        console.error("Streaming error:", error);
+        setStreamStatus("Connection lost. Attempting to resume...");
+        resumeStreaming();
       }
       setIsStreaming(false);
     }
@@ -177,6 +306,8 @@ export default function Home() {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    clearInactivityTimer();
+    clearLastSeenIndex();
     setIsStreaming(false);
     setStreamStatus("Stopped");
   };
@@ -184,21 +315,44 @@ export default function Home() {
   const clearWords = () => {
     setStreamedWords([]);
     setStreamStatus("");
+    clearLastSeenIndex();
+    clearStreamedWords();
   };
 
-  // Cleanup on unmount
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/sign-in");
+  };
+
+  useEffect(() => {
+    // Restore previously streamed words (if any) from localStorage
+    const savedWords = getStreamedWords();
+    if (savedWords.length) {
+      setStreamedWords(savedWords);
+    }
+  }, []);
+
+  // Attempt to resume if we have an unfinished stream
+  useEffect(() => {
+    const lastIndex = getLastSeenIndex();
+    if (lastIndex > 0 && streamedWords.length < lastIndex && !isStreaming) {
+      resumeStreaming();
+    }
+  }, [streamedWords]);
+
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      clearInactivityTimer();
     };
   }, []);
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <LoaderCircle className="animate-spin h-8 w-8 text-primary" />
+        <LoaderCircleIcon className="animate-spin h-8 w-8 text-primary" />
       </div>
     );
   }
@@ -228,7 +382,7 @@ export default function Home() {
               disabled={isStreaming}
               className="flex items-center gap-2"
             >
-              <Play className="h-4 w-4" />
+              <PlayIcon className="h-4 w-4" />
               Start
             </Button>
 
@@ -238,16 +392,17 @@ export default function Home() {
               variant="outline"
               className="flex items-center gap-2"
             >
-              <Square className="h-4 w-4" />
+              <SquareIcon className="h-4 w-4" />
               Stop
             </Button>
 
             <Button
               onClick={clearWords}
+              disabled={isStreaming}
               variant="outline"
               className="flex items-center gap-2"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2Icon className="h-4 w-4" />
               Clear
             </Button>
           </div>
@@ -276,6 +431,11 @@ export default function Home() {
 
           <div className="text-xs text-muted-foreground">
             Words received: {streamedWords.length}
+            {getLastSeenIndex() > 0 && (
+              <span className="ml-4">
+                Last seen index: {getLastSeenIndex()}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -291,7 +451,7 @@ export default function Home() {
               variant="outline"
               className="flex items-center gap-2"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOutIcon className="h-4 w-4" />
               Sign Out
             </Button>
           </div>
