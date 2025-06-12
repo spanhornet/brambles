@@ -24,7 +24,9 @@ func ConnectToDatabase(dsn string) (*gorm.DB, error) {
 
 func Migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
-		&models.User{},
+		&models.Chat{},
+		&models.Message{},
 		&models.Session{},
+		&models.User{},
 	)
 }

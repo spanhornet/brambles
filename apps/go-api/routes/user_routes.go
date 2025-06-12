@@ -7,7 +7,7 @@ import (
 	"github.com/spanhornet/brambles/apps/go-api/controllers"
 )
 
-func RegisterRoutes(router fiber.Router, db *gorm.DB) {
+func RegisterUserRoutes(router fiber.Router, db *gorm.DB) {
 	userGroup := router.Group("/users")
 	controllers.RegisterUserRoutes(userGroup, db)
 }

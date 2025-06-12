@@ -34,6 +34,11 @@ func main() {
 		log.Fatalf("error connecting to database: %v", err)
 	}
 
+	// Migrate database
+	if err := database.Migrate(db); err != nil {
+		log.Fatalf("error migrating database: %v", err)
+	}
+
 	// Start server
 	app := fiber.New()
 	app.Use(logger.New(logger.Config{
@@ -46,7 +51,9 @@ func main() {
 	}))
 
 	v1 := app.Group(apiVersion)
-	routes.RegisterRoutes(v1, db)
+
+	routes.RegisterUserRoutes(v1, db)
+	routes.RegisterChatRoutes(v1, db)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})

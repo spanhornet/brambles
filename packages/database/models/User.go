@@ -13,11 +13,14 @@ type User struct {
 	UpdatedAt time.Time
 	DeletedAt time.Time
 
-	FirstName       string `gorm:"not null"`
-	LastName        string `gorm:"not null"`
+	FirstName string `gorm:"not null"`
+	LastName  string `gorm:"not null"`
+
 	Email           string `gorm:"uniqueIndex;not null"`
 	IsEmailVerified bool   `gorm:"default:false"`
+
 	Phone           string `gorm:"uniqueIndex;not null"`
 	IsPhoneVerified bool   `gorm:"default:false"`
-	Password        string `gorm:"not null"`
+
+	Password string `gorm:"not null"`
 }
