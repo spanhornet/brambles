@@ -59,8 +59,6 @@ func RegisterChatRoutes(group fiber.Router) {
 			w.Flush()
 		})
 
-		return c.Status(200).JSON(fiber.Map{
-			"message": "successfully streamed message",
-		})
+		return nil
 	})
 }
