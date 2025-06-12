@@ -1,5 +1,8 @@
 "use client"
 
+// React Hooks
+import { useState, useEffect } from "react";
+
 // Next.js Hooks
 import { useTheme } from "next-themes";
 
@@ -7,8 +10,19 @@ import { useTheme } from "next-themes";
 import { SignUpForm } from "./components/SignUpForm";
 
 export default function SignUpPage() {
-  // Get the current theme
+  // Get theme
   const { theme } = useTheme();
+
+  // Set mounted
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
