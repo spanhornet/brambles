@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 
 // UI Components
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 // `ModeToggle` Component
 import { ModeToggle } from "@/components/mode-toggle";
@@ -23,6 +24,8 @@ import {
   SquareIcon,
   Trash2Icon,
 } from "lucide-react";
+
+import { api } from "@/lib/api-handler";
 
 interface StreamEvent {
   word?: string;
@@ -56,6 +59,12 @@ export default function Home() {
   const INACTIVITY_TIMEOUT = 5000;
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Set state for message
+  const MESSAGE = "Hello, world! This is a demonstration of Server-Sent Events streaming words one by one. Each word appears with a slight delay to simulate real-time generation."
+
+  // Add state for chat name
+  const [chatName, setChatName] = useState("");
+
   const saveLastSeenIndex = (index: number) => {
     localStorage.setItem("lastSeenIndex", index.toString());
   };
@@ -73,7 +82,7 @@ export default function Home() {
     try {
       localStorage.setItem("streamedWords", JSON.stringify(words));
     } catch {
-      /* ignore quota / serialization errors */
+      // Ignore serialization errors
     }
   };
 
@@ -131,8 +140,12 @@ export default function Home() {
       const response = await fetch("http://localhost:8080/api/v1/chat/demo-chat/resume", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lastSeenIndex: lastIndex }),
+        body: JSON.stringify({
+          lastSeenIndex: lastIndex,
+          message: MESSAGE
+        }),
         signal: abortController.signal,
+        credentials: "include",
       });
 
       if (!response.ok) throw new Error("Resume request failed");
@@ -223,9 +236,10 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: "Hello, world! This is a demonstration of Server-Sent Events streaming words one by one. Each word appears with a slight delay to simulate real-time generation.",
+          message: MESSAGE,
         }),
         signal: abortController.signal,
+        credentials: "include",
       });
 
       if (!response.ok) throw new Error("Initial stream request failed");
@@ -322,6 +336,18 @@ export default function Home() {
   const handleSignOut = async () => {
     await signOut();
     router.push("/sign-in");
+  };
+
+  // Add function to handle chat creation
+  const createChat = async () => {
+    if (!chatName) return;
+    try {
+      const newChat = await api.post("/api/v1/chat", { name: chatName });
+      console.log("Chat created:", newChat);
+      setChatName(""); // Clear input after creation
+    } catch (error) {
+      console.error("Error creating chat:", error);
+    }
   };
 
   useEffect(() => {
@@ -457,6 +483,27 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Chat Creation Section */}
+      <div className="border rounded-lg p-6 bg-card">
+        <h2 className="text-xl font-semibold mb-4">Chat Creation</h2>
+        <div className="flex items-center space-x-2">
+          <Input
+            type="text"
+            value={chatName}
+            onChange={(e) => setChatName(e.target.value)}
+            placeholder="Enter chat name"
+            className="w-full"
+          />
+          <Button
+            onClick={createChat}
+            disabled={!chatName}
+            className="flex items-center gap-2"
+          >
+            Create chat
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

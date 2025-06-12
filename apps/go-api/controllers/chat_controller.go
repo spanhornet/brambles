@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
+
+	"github.com/spanhornet/brambles/packages/database/models"
 )
 
-func RegisterChatRoutes(group fiber.Router) {
-	defaultMessage := "Hello there! This is a demonstration of Server-Sent Events streaming words one by one. Each word appears with a slight delay to simulate real-time generation."
-
+func RegisterChatRoutes(group fiber.Router, db *gorm.DB) {
+	// Start a chat (POST /:id/message)
 	group.Post("/:id/message", func(c *fiber.Ctx) error {
 		chatID := c.Params("id")
 
@@ -19,20 +21,18 @@ func RegisterChatRoutes(group fiber.Router) {
 			Message string `json:"message,omitempty"`
 		}
 		var req StreamMessageRequest
+
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "bad request"})
 		}
 
 		message := req.Message
-		if message == "" {
-			message = defaultMessage
-		}
 		words := strings.Fields(message)
 
 		c.Set("Content-Type", "text/event-stream")
 		c.Set("Cache-Control", "no-cache")
 		c.Set("Connection", "keep-alive")
-		c.Set("Access-Control-Allow-Origin", "*")
+		c.Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		c.Set("Access-Control-Allow-Headers", "Content-Type")
 
 		c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
@@ -55,18 +55,22 @@ func RegisterChatRoutes(group fiber.Router) {
 		return nil
 	})
 
+	// Resume a chat (POST /:id/resume)
 	group.Post("/:id/resume", func(c *fiber.Ctx) error {
 		chatID := c.Params("id")
 
 		type ResumeRequest struct {
-			LastSeenIndex int `json:"lastSeenIndex"`
+			LastSeenIndex int    `json:"lastSeenIndex"`
+			Message       string `json:"message,omitempty"`
 		}
 		var req ResumeRequest
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "bad request"})
 		}
 
-		words := strings.Fields(defaultMessage)
+		message := req.Message
+		words := strings.Fields(message)
+
 		startIndex := req.LastSeenIndex + 1
 		if startIndex >= len(words) {
 			return c.Status(200).SendString("event: complete\ndata: {\"chatId\": \"" + chatID + "\", \"status\": \"completed\", \"totalWords\": " + fmt.Sprintf("%d", len(words)) + "}\n\n")
@@ -75,7 +79,7 @@ func RegisterChatRoutes(group fiber.Router) {
 		c.Set("Content-Type", "text/event-stream")
 		c.Set("Cache-Control", "no-cache")
 		c.Set("Connection", "keep-alive")
-		c.Set("Access-Control-Allow-Origin", "*")
+		c.Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		c.Set("Access-Control-Allow-Headers", "Content-Type")
 
 		c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
@@ -92,5 +96,40 @@ func RegisterChatRoutes(group fiber.Router) {
 		})
 
 		return nil
+	})
+
+	// Create a chat (POST /)
+	group.Post("/", func(c *fiber.Ctx) error {
+		// Define the form values
+		type CreateChatFormValues struct {
+			Name string `json:"name"`
+		}
+
+		// Parse the form values
+		var input CreateChatFormValues
+
+		if err := c.BodyParser(&input); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "bad request"})
+		}
+
+		// Get the authenticated user
+		user, ok := c.Locals("user").(models.User)
+		if !ok {
+			return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+		}
+
+		// Create a chat
+		chat := models.Chat{
+			Name:   input.Name,
+			UserID: user.ID,
+		}
+
+		// Save the chat to the database
+		if err := db.Create(&chat).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "could not create chat"})
+		}
+
+		// Return the chat
+		return c.Status(201).JSON(chat)
 	})
 }

@@ -9,5 +9,5 @@ import (
 
 func RegisterChatRoutes(router fiber.Router, db *gorm.DB) {
 	chatGroup := router.Group("/chat")
-	controllers.RegisterChatRoutes(chatGroup)
+	controllers.RegisterChatRoutes(chatGroup, db)
 }

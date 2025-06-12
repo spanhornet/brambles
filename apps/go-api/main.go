@@ -10,8 +10,8 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/spanhornet/brambles/apps/go-api/middlewares"
 	"github.com/spanhornet/brambles/apps/go-api/routes"
-
 	"github.com/spanhornet/brambles/packages/database"
 )
 
@@ -41,6 +41,7 @@ func main() {
 
 	// Start server
 	app := fiber.New()
+
 	app.Use(logger.New(logger.Config{
 		Format: "[${ip}]:${port} ${status} - ${method} ${path}\n",
 	}))
@@ -51,6 +52,8 @@ func main() {
 	}))
 
 	v1 := app.Group(apiVersion)
+
+	v1.Use(middlewares.AuthMiddleware(db))
 
 	routes.RegisterUserRoutes(v1, db)
 	routes.RegisterChatRoutes(v1, db)

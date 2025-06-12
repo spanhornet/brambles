@@ -12,7 +12,7 @@ import (
 )
 
 func RegisterUserRoutes(group fiber.Router, db *gorm.DB) {
-	// Get current user info (GET /me)
+	// Get current user (GET /me)
 	group.Get("/me", func(c *fiber.Ctx) error {
 		token := c.Cookies("session")
 		if token == "" {
