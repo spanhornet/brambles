@@ -132,4 +132,22 @@ func RegisterChatRoutes(group fiber.Router, db *gorm.DB) {
 		// Return the chat
 		return c.Status(201).JSON(chat)
 	})
+
+	// Get all chats for a user (GET /)
+	group.Get("/", func(c *fiber.Ctx) error {
+		// Get the authenticated user
+		user, ok := c.Locals("user").(models.User)
+		if !ok {
+			return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
+		}
+
+		// Retrieve all chats for the user
+		var chats []models.Chat
+		if err := db.Where("user_id = ?", user.ID).Find(&chats).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "could not retrieve chats"})
+		}
+
+		// Return the list of chats
+		return c.Status(200).JSON(chats)
+	})
 }

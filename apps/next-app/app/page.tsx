@@ -65,6 +65,9 @@ export default function Home() {
   // Add state for chat name
   const [chatName, setChatName] = useState("");
 
+  // Add state for chats
+  const [chats, setChats] = useState<any[]>([]);
+
   const saveLastSeenIndex = (index: number) => {
     localStorage.setItem("lastSeenIndex", index.toString());
   };
@@ -338,13 +341,24 @@ export default function Home() {
     router.push("/sign-in");
   };
 
-  // Add function to handle chat creation
+  // Add function to fetch chats
+  const fetchChats = async () => {
+    try {
+      const response = await api.get("/api/v1/chat");
+      setChats(response as any);
+    } catch (error) {
+      console.error("Error fetching chats:", error);
+    }
+  };
+
+  // Refresh chats after creation
   const createChat = async () => {
     if (!chatName) return;
     try {
       const newChat = await api.post("/api/v1/chat", { name: chatName });
       console.log("Chat created:", newChat);
-      setChatName(""); // Clear input after creation
+      setChatName("");
+      fetchChats();
     } catch (error) {
       console.error("Error creating chat:", error);
     }
@@ -365,6 +379,11 @@ export default function Home() {
       resumeStreaming();
     }
   }, [streamedWords]);
+
+  // Fetch chats when component mounts
+  useEffect(() => {
+    fetchChats();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -484,9 +503,9 @@ export default function Home() {
         </div>
       )}
 
-      {/* Chat Creation Section */}
+      {/* Chat Management Section */}
       <div className="border rounded-lg p-6 bg-card">
-        <h2 className="text-xl font-semibold mb-4">Chat Creation</h2>
+        <h2 className="text-xl font-semibold mb-4">Chat Management</h2>
         <div className="flex items-center space-x-2">
           <Input
             type="text"
@@ -502,6 +521,12 @@ export default function Home() {
           >
             Create chat
           </Button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <pre className="bg-muted p-4 rounded-md text-sm overflow-auto">
+            {JSON.stringify(chats, null, 2)}
+          </pre>
         </div>
       </div>
     </div>
