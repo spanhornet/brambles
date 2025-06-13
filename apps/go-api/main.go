@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -21,24 +22,23 @@ const apiVersion = "/api/v1"
 
 var rdb *redis.Client
 
-func initRedis() {
-	redisURL := os.Getenv("REDIS_URL")
+func initRedis() error {
+	rdb = redis.NewClient(&redis.Options{
+		Addr:     os.Getenv("REDIS_ADDRESS"),
+		Username: os.Getenv("REDIS_USERNAME"),
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       0,
+	})
 
-	opt, err := redis.ParseURL(redisURL)
-	if err != nil {
-		log.Fatalf("Failed to parse Redis URL: %v", err)
-	}
-
-	// Initialize Redis client
-	rdb = redis.NewClient(opt)
-
-	// Verify connection
+	// Test the connection
 	ctx := context.Background()
-	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Fatalf("Unable to connect to Redis: %v", err)
+	_, err := rdb.Ping(ctx).Result()
+	if err != nil {
+		return fmt.Errorf("failed to connect to Redis: %v", err)
 	}
 
-	log.Println("Connected to Redis Cloud successfully.")
+	log.Println("Successfully connected to Redis")
+	return nil
 }
 
 func main() {
@@ -48,7 +48,9 @@ func main() {
 	}
 
 	// Initialize Redis
-	initRedis()
+	if err := initRedis(); err != nil {
+		log.Fatal(err)
+	}
 
 	dsn := os.Getenv("SUPABASE_DATABASE_CONNECTION_STRING")
 	if dsn == "" {
@@ -85,9 +87,10 @@ func main() {
 
 	v1 := app.Group(apiVersion)
 
+	routes.RegisterUserRoutes(v1, db)
+
 	v1.Use(middlewares.AuthMiddleware(db))
 
-	routes.RegisterUserRoutes(v1, db)
 	routes.RegisterChatRoutes(v1, db)
 
 	app.Get("/health", func(c *fiber.Ctx) error {

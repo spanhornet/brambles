@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/spanhornet/brambles/packages/database/models"
@@ -17,8 +18,15 @@ func RegisterChatRoutes(group fiber.Router, db *gorm.DB) {
 	group.Post("/:id/message", func(c *fiber.Ctx) error {
 		chatID := c.Params("id")
 
+		// Parse UUID from string
+		chatUUID, err := uuid.Parse(chatID)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid chat ID"})
+		}
+
 		type StreamMessageRequest struct {
 			Message string `json:"message,omitempty"`
+			Role    string `json:"role,omitempty"`
 		}
 		var req StreamMessageRequest
 
@@ -26,8 +34,24 @@ func RegisterChatRoutes(group fiber.Router, db *gorm.DB) {
 			return c.Status(400).JSON(fiber.Map{"error": "bad request"})
 		}
 
-		message := req.Message
-		words := strings.Fields(message)
+		// Set default role if not provided
+		if req.Role == "" {
+			req.Role = "user" // Default role
+		}
+
+		// Create and save the message
+		message := models.Message{
+			ChatID:  chatUUID,
+			Role:    req.Role,
+			Content: req.Message,
+			Model:   "", // Can be set if needed
+		}
+
+		if err := db.Create(&message).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "could not save message"})
+		}
+
+		words := strings.Fields(req.Message)
 
 		c.Set("Content-Type", "text/event-stream")
 		c.Set("Cache-Control", "no-cache")
@@ -37,7 +61,7 @@ func RegisterChatRoutes(group fiber.Router, db *gorm.DB) {
 
 		c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
 			fmt.Fprintf(w, "event: start\n")
-			fmt.Fprintf(w, "data: {\"chatId\": \"%s\", \"status\": \"streaming\"}\n\n", chatID)
+			fmt.Fprintf(w, "data: {\"chatId\": \"%s\", \"status\": \"streaming\", \"messageId\": \"%s\"}\n\n", chatID, message.ID)
 			w.Flush()
 
 			for i, word := range words {
@@ -48,7 +72,7 @@ func RegisterChatRoutes(group fiber.Router, db *gorm.DB) {
 			}
 
 			fmt.Fprintf(w, "event: complete\n")
-			fmt.Fprintf(w, "data: {\"chatId\": \"%s\", \"status\": \"completed\", \"totalWords\": %d}\n\n", chatID, len(words))
+			fmt.Fprintf(w, "data: {\"chatId\": \"%s\", \"status\": \"completed\", \"totalWords\": %d, \"messageId\": \"%s\"}\n\n", chatID, len(words), message.ID)
 			w.Flush()
 		})
 
@@ -141,9 +165,9 @@ func RegisterChatRoutes(group fiber.Router, db *gorm.DB) {
 			return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
 		}
 
-		// Retrieve all chats for the user
+		// Retrieve all chats for the user with their messages
 		var chats []models.Chat
-		if err := db.Where("user_id = ?", user.ID).Find(&chats).Error; err != nil {
+		if err := db.Preload("Messages").Where("user_id = ?", user.ID).Find(&chats).Error; err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "could not retrieve chats"})
 		}
 
