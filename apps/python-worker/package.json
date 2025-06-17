@@ -1,0 +1,8 @@
+{
+  "name": "python-worker",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "python3 -m venv venv && venv/bin/pip install -r requirements.txt",
+    "dev": "venv/bin/watchmedo auto-restart --directory=. --pattern='*.py' --recursive -- venv/bin/python main.py"
+  }
+}
