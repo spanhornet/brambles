@@ -58,6 +58,7 @@ func main() {
 	v1 := app.Group(version)
 
 	routes.RegisterUserRoutes(v1, db)
+	routes.RegisterChatRoutes(v1, db)
 
 	// Start server
 	port := os.Getenv("PORT")
