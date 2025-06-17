@@ -1,4 +1,4 @@
-export type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+export type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS';
 
 export interface FetchOptions extends RequestInit {
   method?: RequestMethod;
