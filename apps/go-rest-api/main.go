@@ -9,8 +9,11 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/spanhornet/brambles/apps/go-rest-api/routes"
 	"github.com/spanhornet/brambles/packages/database"
 )
+
+const version = "/api/v1"
 
 func main() {
 	// Load environment variables
@@ -45,6 +48,10 @@ func main() {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.SendString("OK")
 	})
+
+	v1 := app.Group(version)
+
+	routes.RegisterUserRoutes(v1, db)
 
 	// Start server
 	port := os.Getenv("PORT")
