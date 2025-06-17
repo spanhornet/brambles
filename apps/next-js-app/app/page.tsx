@@ -44,7 +44,7 @@ export default function Home() {
         </div>
         {user && (
           <div className="border rounded-lg p-6 bg-card">
-            <h2 className="text-xl font-semibold mb-4">User Session</h2>
+            <h2 className="text-xl font-medium mb-4">User Session</h2>
             <div className="space-y-2">
               <pre className="bg-muted p-4 rounded-md text-sm overflow-auto">{JSON.stringify(user, null, 2)}</pre>
               <Button

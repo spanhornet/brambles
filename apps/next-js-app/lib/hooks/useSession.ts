@@ -5,16 +5,16 @@ import { api } from '@/lib/api-handler';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface User {
-  ID: string;
-  CreatedAt: string;
-  UpdatedAt: string;
-  DeletedAt: string;
-  FirstName: string;
-  LastName: string;
-  Email: string;
-  IsEmailVerified: boolean;
-  Phone: string;
-  IsPhoneVerified: boolean;
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  isEmailVerified: boolean;
+  phone: string;
+  isPhoneVerified: boolean;
 }
 
 export function useSession() {

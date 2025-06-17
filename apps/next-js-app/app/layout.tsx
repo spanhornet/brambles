@@ -44,10 +44,11 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
+
             {children}
           </ThemeProvider>
         </ReactQueryProvider>
       </body>
-    </html>
+    </html >
   );
 }
