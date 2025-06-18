@@ -16,6 +16,7 @@ import (
 
 	"github.com/spanhornet/brambles/apps/go-rest-api/middlewares"
 	"github.com/spanhornet/brambles/apps/go-rest-api/routes"
+	"github.com/spanhornet/brambles/apps/go-rest-api/services"
 	"github.com/spanhornet/brambles/packages/database"
 )
 
@@ -57,6 +58,12 @@ func main() {
 	}
 	migrate(db)
 
+	// Initialize R2 client
+	if err := services.InitCloudflareR2Client(); err != nil {
+		log.Fatalf("error initializing Cloudflare R2 client: %v", err)
+	}
+	log.Println("Cloudflare R2 client initialized successfully")
+
 	// Create app
 	app := fiber.New(fiber.Config{
 		Prefork:      false,
@@ -79,6 +86,7 @@ func main() {
 	v1 := app.Group(version)
 	routes.RegisterUserRoutes(v1, db)
 	routes.RegisterChatRoutes(v1, db)
+	routes.RegisterDocumentRoutes(v1, db)
 
 	// Launch server
 	go func() {
