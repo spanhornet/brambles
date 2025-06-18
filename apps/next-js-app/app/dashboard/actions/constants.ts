@@ -20,3 +20,18 @@ export interface Chat {
   Name: string;
   Messages: Message[];
 }
+
+export type Document = {
+  ID: string;
+  UserID: string;
+  ChatID: string;
+  CreatedAt: string;
+  UpdatedAt: string;
+  DeletedAt?: string | null;
+  Bucket: string;
+  ObjectKey: string;
+  URL: string;
+  FileName: string;
+  FileSize: number;
+  MimeType: string;
+};
