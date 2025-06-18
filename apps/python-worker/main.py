@@ -1,48 +1,30 @@
+# Utilities
 import os
 import json
 import time
+
+# Redis
 import redis
+
+# Services
+from services.redis_cloud_service import connect_to_redis_cloud
+
+# Configuration
 from dotenv import load_dotenv
+from config.settings import settings
 
 # Load environment variables
 load_dotenv()
 
-# Redis connection details
-REDIS_ADDRESS  = os.getenv("REDIS_ADDRESS")
-REDIS_PORT     = int(os.getenv("REDIS_PORT", "6379"))
-REDIS_USERNAME = os.getenv("REDIS_USERNAME")
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
-
-
-def connect_to_redis():
-    """Connect to Redis Cloud and return the client, or None on failure."""
-    try:
-        client = redis.Redis(
-            host=REDIS_ADDRESS,
-            port=REDIS_PORT,
-            username=REDIS_USERNAME,
-            password=REDIS_PASSWORD,
-            decode_responses=True,
-        )
-        client.ping()
-        print("Redis Cloud client initialized.")
-        return client
-    except redis.ConnectionError as e:
-        print(f"Unable to connect to Redis Cloud: {e}")
-    except Exception as e:
-        print(f"Redis Cloud connection error: {e}")
-    return None
-
-
 def main():
     print("Python worker started — connecting to Redis Cloud…")
 
-    client = connect_to_redis()
+    client = connect_to_redis_cloud()
     if not client:
         print("Failed to connect to Redis. Exiting.")
         return
 
-    print("Waiting for document jobs on 'document_jobs' queue (Ctrl-C to stop).")
+    print("Waiting for document jobs on 'document_jobs' queue (Ctrl-C to stop)... \n")
 
     try:
         while True:
@@ -77,13 +59,13 @@ def main():
             except redis.ConnectionError as e:
                 print(f"Redis connection lost: {e}")
                 print("Attempting to reconnect…")
-                client = connect_to_redis()
+                client = connect_to_redis_cloud()
                 if not client:
                     print("Failed to reconnect. Exiting.")
                     break
 
     except KeyboardInterrupt:
-        print("\nWorker interrupted — shutting down gracefully.")
+        print("\nWorker interrupted — shutting down gracefully. \n")
     except Exception as e:
         print(f"Unexpected error: {e}")
 
