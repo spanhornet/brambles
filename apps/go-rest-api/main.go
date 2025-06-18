@@ -58,11 +58,17 @@ func main() {
 	}
 	migrate(db)
 
-	// Initialize R2 client
+	// Initialize Cloudflare R2 client
 	if err := services.InitCloudflareR2Client(); err != nil {
 		log.Fatalf("error initializing Cloudflare R2 client: %v", err)
 	}
 	log.Println("Cloudflare R2 client initialized successfully")
+
+	// Initialize Redis Cloudclient
+	if err := services.InitRedisCloudClient(); err != nil {
+		log.Fatalf("error initializing Redis client: %v", err)
+	}
+	log.Println("Redis Cloud client initialized successfully")
 
 	// Create app
 	app := fiber.New(fiber.Config{

@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-
 // `ModeToggle` Component
 import { ModeToggle } from "@/components/mode-toggle"
 
@@ -41,7 +40,36 @@ export default function ChatIdPage() {
   const chat = chats?.find(chat => chat.ID === chatId)
 
   // Fetch documents
-  const { data: documents } = useDocuments(chatId)
+  const { data: documents, createDocument, enqueueDocument } = useDocuments(chatId)
+
+  // Handle document upload
+  const handleOnUpload = async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('chatId', chatId)
+
+    try {
+      // Upload the document
+      const uploadResult = await createDocument.mutateAsync(formData)
+      console.log('Document uploaded successfully:', uploadResult)
+
+      // Automatically enqueue the document for processing
+      if (uploadResult?.ID) {
+        try {
+          const enqueueResult = await enqueueDocument.mutateAsync(uploadResult.ID)
+          console.log('Document enqueued for processing:', enqueueResult)
+        } catch (enqueueError) {
+          console.error('Failed to enqueue document:', enqueueError)
+          // Note: Document was uploaded successfully, just enqueueing failed
+        }
+      }
+
+      return uploadResult
+    } catch (error) {
+      console.error('Upload failed:', error)
+      throw error
+    }
+  }
 
   // Helper to format date time
   const formatDate = (dateString: string) => {
@@ -91,7 +119,10 @@ export default function ChatIdPage() {
           aria-label="Documents list"
         >
           <ScrollArea className="h-full space-y-4 p-4">
-            <InputDocument accept={["application/pdf"]} chatId={chatId} />
+            <InputDocument
+              accept={["application/pdf"]}
+              onUpload={handleOnUpload}
+            />
 
             <div className="mt-4 space-y-2">
               {documents && documents.map((document) => (

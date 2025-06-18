@@ -47,8 +47,20 @@ export function useDocuments(chatId?: string) {
     },
   });
 
+  const enqueueDocumentMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const { data, error } = await api.post(`/api/v1/documents/${documentId}/enqueue`);
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+  });
+
   return {
     ...documentsQuery,
     createDocument: createDocumentMutation,
+    enqueueDocument: enqueueDocumentMutation,
   };
 }

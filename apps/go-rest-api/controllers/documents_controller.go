@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -13,6 +14,18 @@ import (
 	"github.com/spanhornet/brambles/apps/go-rest-api/services"
 	"github.com/spanhornet/brambles/packages/database/models"
 )
+
+// DocumentJobPayload represents the job payload for document processing
+type DocumentJobPayload struct {
+	JobID     string `json:"JobID"`
+	JobType   string `json:"JobType"`
+	JobStatus string `json:"JobStatus"`
+
+	UserID string `json:"UserId"`
+	ChatID string `json:"ChatId"`
+
+	Document models.Document `json:"Document"`
+}
 
 func RegisterDocumentRoutes(group fiber.Router, db *gorm.DB) {
 	// GET /documents
@@ -118,5 +131,77 @@ func RegisterDocumentRoutes(group fiber.Router, db *gorm.DB) {
 
 		// Return document
 		return c.Status(fiber.StatusCreated).JSON(doc)
+	})
+
+	// POST /:id/enqueue - Enqueue document for processing
+	group.Post("/:id/enqueue", func(c *fiber.Ctx) error {
+		documentID := c.Params("id")
+
+		// Parse UUID
+		documentUUID, err := uuid.Parse(documentID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid document ID"})
+		}
+
+		// Get the authenticated user
+		user, ok := c.Locals("user").(models.User)
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
+		}
+
+		// Fetch the document
+		var document models.Document
+		if err := db.Where("id = ? AND user_id = ?", documentUUID, user.ID).First(&document).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "document not found"})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not verify document ownership"})
+		}
+
+		// Create the job payload
+		jobPayload := DocumentJobPayload{
+			JobID:     uuid.New().String(),
+			JobType:   "document_job",
+			JobStatus: "Not started",
+			UserID:    user.ID.String(),
+			ChatID:    document.ChatID.String(),
+			Document: models.Document{
+				ID:        document.ID,
+				UserID:    document.UserID,
+				ChatID:    document.ChatID,
+				CreatedAt: document.CreatedAt,
+				UpdatedAt: document.UpdatedAt,
+				DeletedAt: document.DeletedAt,
+				Bucket:    document.Bucket,
+				ObjectKey: document.ObjectKey,
+				URL:       document.URL,
+				FileName:  document.FileName,
+				FileSize:  document.FileSize,
+				MimeType:  document.MimeType,
+			},
+		}
+
+		// Marshal the job payload
+		payloadJSON, err := json.Marshal(jobPayload)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not serialize job payload"})
+		}
+
+		// Get Redis Cloud client
+		rdb := services.GetRedisCloudClient()
+		if rdb == nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Redis client not initialized"})
+		}
+
+		// Enqueue the job payload to Redis
+		queueKey := "document_jobs"
+		if err := rdb.LPush(c.Context(), queueKey, payloadJSON).Err(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not enqueue document job"})
+		}
+
+		// Return success response with job details
+		return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+			"job": jobPayload,
+		})
 	})
 }
