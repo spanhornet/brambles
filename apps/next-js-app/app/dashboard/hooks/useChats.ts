@@ -8,7 +8,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Chat } from '../actions/constants';
 
 export function useChats() {
-  return useQuery<Chat[]>({
+  const queryClient = useQueryClient();
+
+  const chatsQuery = useQuery<Chat[]>({
     queryKey: ['chats'],
     queryFn: async () => {
       const { data, error } = await api.get<Chat[]>('/api/v1/chats');
@@ -16,21 +18,8 @@ export function useChats() {
       return data ?? [];
     },
   });
-}
 
-export function useChat(chatId: string) {
-  const { data: chats } = useChats();
-
-  const chat = chats?.find(chat => chat.ID === chatId);
-
-  return {
-    data: chat,
-  };
-}
-
-export function useCreateChat() {
-  const queryClient = useQueryClient();
-  return useMutation({
+  const createChatMutation = useMutation({
     mutationFn: async (name: string) => {
       const { data, error } = await api.post<Chat>('/api/v1/chats', { name });
       if (error) throw error;
@@ -40,4 +29,9 @@ export function useCreateChat() {
       queryClient.invalidateQueries({ queryKey: ['chats'] });
     },
   });
+
+  return {
+    ...chatsQuery,
+    createChat: createChatMutation,
+  };
 }

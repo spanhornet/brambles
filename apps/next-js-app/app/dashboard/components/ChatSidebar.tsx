@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { useCallback } from "react"
 
 // Custom Hooks
-import { useChats, useCreateChat } from "../hooks/useChats"
+import { useChats } from "../hooks/useChats"
 
 // UI Components
 import {
@@ -36,20 +36,20 @@ export function ChatSidebar() {
   const selectedChatId = params?.chatId as string | undefined
 
   // Get chats
-  const { data: chats } = useChats()
-
-  // Get create chat mutation
-  const createChatMutation = useCreateChat()
+  const {
+    data: chats,
+    createChat
+  } = useChats()
 
   // Handle chat on create
   const handleChatOnCreate = useCallback(async () => {
     try {
-      const newChat = await createChatMutation.mutateAsync("New Chat")
+      const newChat = await createChat.mutateAsync("New Chat")
       router.push(`/dashboard/${newChat.ID}`)
     } catch (error) {
       console.error("Failed to create chat:", error)
     }
-  }, [createChatMutation, router])
+  }, [createChat, router])
 
   return (
     <Sidebar>
